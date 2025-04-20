@@ -8,24 +8,25 @@ import openai
 
 app = func.FunctionApp()
 
-# Load keys from environment variables (set in local.settings.json)
 openai.api_key = os.environ.get("OPENAI_API_KEY")
 BEARER_TOKEN = os.environ.get("TWITTER_BEARER_TOKEN")
 
-def get_tweet_id(url):
-    match = re.search(r'/status/(\d+)', url)
-    if not match:
-        raise Exception("Invalid Tweet URL")
-    return match.group(1)
+def get_tweets_ids(urls: list):
+    ids = []
+    for url in urls:
+        match = re.search(r'/status/(\d+)', url)
+        if not match:
+            raise Exception("Invalid Tweet URL")
+        ids.append(match.group(1))
+    return ids
 
-def get_tweet_text(tweet_ids: list):
+def get_tweets(tweet_ids: list):
     url = "https://api.twitter.com/2/tweets"
     headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
     params = {"ids": tweet_ids, "tweet.fields": "author_id"}
     res = requests.get(url, headers=headers, params=params)
     data = res.json()
-    print(data)
-    return data['data']['text']
+    return data['data']
 
 def generate_flashcard(tweet_text, tweet_url):
     prompt = f"""
@@ -57,18 +58,17 @@ def generateFlashcard(req: func.HttpRequest) -> func.HttpResponse:
     logging.info("Processing flashcard generation")
 
     try:
-        tweet_url = req.params.get('url')
-        if not tweet_url:
+        tweet_urls = req.params.get('urls')
+        if not tweet_urls:
             req_body = req.get_json()
-            tweet_url = req_body.get("url")
-
-        if not tweet_url:
+            tweet_urls = req_body.get("urls")
+        if not tweet_urls:
             return func.HttpResponse("Missing tweet URL", status_code=400)
 
-        tweet_id = get_tweet_id(tweet_url)
-        tweet_text = get_tweet_text(tweet_id)
-        # tweet_text = "How you feel about yourself is how you feel about the world"
-        front, back = generate_flashcard(tweet_text, tweet_url)
+        tweet_ids = get_tweets_ids(tweet_urls)
+        tweets = get_tweets(tweet_ids)
+        for url, tweet in zip(tweet_urls, tweets):
+            front, back = generate_flashcard(tweet_text=tweet['text'], tweet_url=url)
 
         return func.HttpResponse(
             json.dumps({"front": front, "back": back}),
