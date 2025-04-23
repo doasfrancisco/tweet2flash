@@ -9,6 +9,7 @@ import openai
 app = func.FunctionApp()
 
 openai.api_key = os.environ.get("OPENAI_API_KEY")
+EXA_API = os.environ.get("EXA_API")
 BEARER_TOKEN = os.environ.get("TWITTER_BEARER_TOKEN")
 
 def get_tweets_ids(urls: list):
@@ -20,7 +21,7 @@ def get_tweets_ids(urls: list):
         ids.append(match.group(1))
     return ids
 
-def get_tweets(tweet_ids: list):
+def get_tweets_official_api(tweet_ids: list):
     url = "https://api.twitter.com/2/tweets"
     headers = {"Authorization": f"Bearer {BEARER_TOKEN}"}
     params = {"ids": tweet_ids, "tweet.fields": "author_id"}
@@ -28,9 +29,24 @@ def get_tweets(tweet_ids: list):
     data = res.json()
     return data['data']
 
+def get_tweets(urls: list):
+    url = "https://api.exa.ai/contents"
+    headers = {
+        "x-api-key": EXA_API,
+        "Content-Type": "application/json"
+    }
+    data = {
+        "urls": urls,
+        "text": True
+    }
+    response = requests.post(url=url, headers=headers, json=data)
+    logging.info(json.dumps(response.json(), indent=4))
+    return response.json()['results']
+
+
 def generate_flashcard(tweet_text, tweet_url):
     prompt = f"""
-    Create a flashcard from this tweet.
+    Create a flashcard from this tweet. Ignore all metadata.
 
     Tweet: "{tweet_text}"
 
@@ -39,7 +55,7 @@ def generate_flashcard(tweet_text, tweet_url):
 
     Return it as Front: ... and Back: ...
 
-    Make sure to not modify the tweet text.
+    Make sure to not modify the relevant tweet text.
     """
 
     response = openai.responses.create(
@@ -65,8 +81,8 @@ def generateFlashcard(req: func.HttpRequest) -> func.HttpResponse:
         if not tweet_urls:
             return func.HttpResponse("Missing tweet URL", status_code=400)
 
-        tweet_ids = get_tweets_ids(tweet_urls)
-        tweets = get_tweets(tweet_ids)
+        # tweet_ids = get_tweets_ids(tweet_urls)
+        tweets = get_tweets(tweet_urls)
         for url, tweet in zip(tweet_urls, tweets):
             front, back = generate_flashcard(tweet_text=tweet['text'], tweet_url=url)
 
