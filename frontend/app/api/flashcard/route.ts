@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       const data = await res.json();
       return NextResponse.json(data);
     } catch (error) {
+      console.error('Error fetching flashcard:', error);
       return NextResponse.json(
         { error: 'Failed to fetch flashcard' },
         { status: 500 }
