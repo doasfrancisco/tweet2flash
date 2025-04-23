@@ -1,4 +1,0 @@
-azure-functions==1.23.0
-exa-py==1.12.1
-openai==1.75.0
-requests==2.32.3
